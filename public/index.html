@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#102a43">
+<title>Secure Logistics | Shipment Tracking</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/"><span class="brandmark">SL</span><span><b>SECURE LOGISTICS</b><small>DELIVERY COMPANY · UNITED STATES</small></span></a>
+  <a class="admin-link" href="/#admin">Staff portal</a>
+</header>
+<main>
+<section class="hero">
+  <div class="eyebrow">SHIP WITH CONFIDENCE</div>
+  <h1>Track your shipment.</h1>
+  <p>Enter your Secure Logistics tracking number to view the latest recorded shipment status.</p>
+  <form id="trackForm" class="track-form">
+    <label for="trackingId">Tracking number</label>
+    <div class="track-row"><input id="trackingId" placeholder="e.g. SLD-US-261012-123456" autocomplete="off" required><button>Track shipment <span aria-hidden="true">→</span></button></div>
+  </form>
+  <div id="trackMessage" class="message" role="status" aria-live="polite"></div>
+</section>
+<section id="result" class="result hidden" aria-live="polite"></section>
+<section id="admin" class="admin">
+  <div class="admin-head"><div><div class="eyebrow">AUTHORIZED PERSONNEL</div><h2>Shipment management</h2><p>Create shipments and update their recorded status.</p></div><span class="lock">▣ Staff access</span></div>
+  <div id="loginPanel" class="panel">
+    <form id="loginForm"><label for="adminPassword">Admin password</label><div class="track-row"><input id="adminPassword" type="password" autocomplete="current-password" placeholder="Enter admin password" required><button>Sign in</button></div><p class="hint">The administrator password is configured by the service owner in the hosting environment.</p></form>
+  </div>
+  <div id="dashboard" class="hidden">
+    <div class="panel">
+      <div class="panel-title"><h3>Create a shipment</h3><span class="pill">New record</span></div>
+      <form id="createForm" class="fields">
+        <div><label for="recipient">Recipient name</label><input id="recipient" required maxlength="160" placeholder="Customer name"></div>
+        <div><label for="origin">Origin city/state</label><input id="origin" required maxlength="160" placeholder="e.g. Dallas, TX"></div>
+        <div><label for="destination">Destination city/state</label><input id="destination" required maxlength="160" placeholder="e.g. Atlanta, GA"></div>
+        <div><label for="eta">Estimated delivery (optional)</label><input id="eta" type="date"></div>
+        <div class="full"><label for="notes">Internal notes (optional)</label><input id="notes" maxlength="500" placeholder="Optional note"></div>
+        <div class="full"><button>Create tracking number</button></div>
+      </form>
+      <div id="created" class="message" role="status"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><h3>Shipments</h3><button type="button" class="secondary" id="refresh">Refresh list</button></div>
+      <div id="shipmentList"><p class="hint">Sign in to load shipments.</p></div>
+    </div>
+    <button type="button" class="secondary signout" id="logout">Sign out</button>
+  </div>
+  <div id="adminMessage" class="message" role="status"></div>
+</section>
+</main>
+<footer><span>© <span id="year"></span> Secure Logistics Delivery Company</span><span>Shipment records reflect updates entered by the service.</span></footer>
+<script src="/app.js" defer></script>
+</body></html>
