@@ -7,8 +7,10 @@ const app = express();
 app.use(express.json({ limit: "100kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
-const DB_FILE = path.join(DATA_DIR, "shipments.json");
+// Prefer the configured persistent-disk directory. Remove a trailing dot if the
+// Render environment variable was accidentally saved as "/var/data.".
+let DATA_DIR = (process.env.DATA_DIR || path.join(__dirname, "data")).replace(/\\.$/, "");
+let DB_FILE = path.join(DATA_DIR, "shipments.json");
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const PORT = process.env.PORT || 3000;
 
@@ -16,7 +18,19 @@ if (!ADMIN_PASSWORD || ADMIN_PASSWORD.length < 16) {
   console.error("Set ADMIN_PASSWORD to a long, unique password (at least 16 characters).");
   process.exit(1);
 }
-fs.mkdirSync(DATA_DIR, { recursive: true });
+try {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+} catch (err) {
+  // Render only permits writes to mounted disks and the service directory.
+  // Keep the service bootable if DATA_DIR points to an unavailable disk, but
+  // warn that local fallback storage is temporary until a persistent disk is configured.
+  if (err.code !== "EACCES" && err.code !== "EPERM" && err.code !== "ENOENT") throw err;
+  const fallbackDir = path.join(__dirname, "data");
+  console.warn(`Cannot access DATA_DIR "${DATA_DIR}" (${err.code}); using "${fallbackDir}". Configure a Render persistent disk mounted at /var/data for durable shipment records.`);
+  DATA_DIR = fallbackDir;
+  DB_FILE = path.join(DATA_DIR, "shipments.json");
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 if (!fs.existsSync(DB_FILE)) fs.writeFileSync(DB_FILE, "[]", { mode: 0o600 });
 
 function readShipments() {
