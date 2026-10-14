@@ -170,6 +170,7 @@ app.post("/api/admin/shipments/:id/location", requireAdmin, (req, res) => {
   const point = {
     latitude, longitude,
     accuracy: Number.isFinite(accuracy) && accuracy >= 0 ? Math.round(accuracy) : null,
+    mode: req.body?.mode === "simulated" ? "simulated" : "device",
     timestamp: new Date().toISOString()
   };
   shipment.currentLocation = point;
