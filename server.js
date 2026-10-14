@@ -140,11 +140,15 @@ app.patch("/api/admin/shipments/:id", requireAdmin, (req, res) => {
   if (body.notes !== undefined) shipment.notes = clean(body.notes, 500);
   const now = new Date().toISOString();
   shipment.updatedAt = now;
+  const checkpointAction = ["arrival", "departure", "delay"].includes(body.checkpointAction) ? body.checkpointAction : "update";
+  const checkpointPrefix = checkpointAction === "arrival" ? "Arrived at checkpoint. " :
+    checkpointAction === "departure" ? "Departed checkpoint. " :
+    checkpointAction === "delay" ? "Delay / stopped. " : "";
   shipment.history.push({
     status: shipment.status,
     location: clean(body.location || shipment.destination),
     timestamp: now,
-    note: clean(body.eventNote || body.notes || "Shipment status updated.", 300)
+    note: clean(checkpointPrefix + (body.eventNote || body.notes || (checkpointAction === "update" ? "Shipment status updated." : "")), 300)
   });
   writeShipments(items);
   res.json(shipment);
