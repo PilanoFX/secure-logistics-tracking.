@@ -51,7 +51,7 @@ async function loadShipments(){
  try{
   const items=await api("/api/admin/shipments");
   if(!items.length){$("shipmentList").innerHTML='<p class="hint">No shipments yet. Create your first shipment above.</p>';return;}
-  $("shipmentList").innerHTML=items.map(s=>`<article class="shipment" data-id="${escapeHtml(s.trackingId)}"><div class="shipment-line"><div><h4>${escapeHtml(s.trackingId)}</h4><p>${escapeHtml(s.recipient)} · ${escapeHtml(s.origin)} → ${escapeHtml(s.destination)}</p><p>Current status: <b>${escapeHtml(s.status)}</b></p></div><button class="secondary copy-id" type="button">Copy ID</button></div><div class="shipment-controls"><div><label>Status</label><select class="new-status">${statuses.map(st=>`<option ${st===s.status?"selected":""}>${escapeHtml(st)}</option>`).join("")}</select></div><div><label>Checkpoint location</label><input class="new-location" placeholder="City, State / facility" value="${escapeHtml(s.history.at(-1)?.location||"")}"></div><div><label>Checkpoint event</label><select class="checkpoint-action"><option value="update">Status update</option><option value="arrival">Arrived at stop</option><option value="departure">Departed stop</option><option value="delay">Delay / stopped</option></select></div><div><label>Update note</label><input class="new-note" placeholder="Optional note"></div><button class="save-update" type="button">Save checkpoint</button></div><div class="gps-controls"><span class="gps-label">${s.gpsSharing?"GPS: sharing":"GPS: not sharing"}${s.currentLocation?" · Last point "+dateText(s.currentLocation.timestamp):""}</span><button class="start-gps" type="button">Start live GPS</button><button class="stop-gps secondary" type="button">Stop GPS</button></div></article>`).join("");
+  $("shipmentList").innerHTML=items.map(s=>`<article class="shipment" data-id="${escapeHtml(s.trackingId)}"><div class="shipment-line"><div><h4>${escapeHtml(s.trackingId)}</h4><p>${escapeHtml(s.recipient)} · ${escapeHtml(s.origin)} → ${escapeHtml(s.destination)}</p><p>Current status: <b>${escapeHtml(s.status)}</b></p></div><button class="secondary copy-id" type="button">Copy ID</button></div><div class="shipment-controls"><div><label>Status</label><select class="new-status">${statuses.map(st=>`<option ${st===s.status?"selected":""}>${escapeHtml(st)}</option>`).join("")}</select></div><div><label>Checkpoint location</label><input class="new-location" placeholder="City, State / facility" value="${escapeHtml(s.history.at(-1)?.location||"")}"></div><div><label>Checkpoint event</label><select class="checkpoint-action"><option value="update">Status update</option><option value="arrival">Arrived at stop</option><option value="departure">Departed stop</option><option value="delay">Delay / stopped</option></select></div><div><label>Update note</label><input class="new-note" placeholder="Optional note"></div><button class="save-update" type="button">Save checkpoint</button></div><div class="gps-controls"><span class="gps-label">${s.gpsSharing?"GPS: sharing":"GPS: not sharing"}${s.currentLocation?" · Last point "+dateText(s.currentLocation.timestamp):""}</span><button class="start-gps" type="button">Start simulated route</button><button class="stop-gps secondary" type="button">Stop / pause route</button></div></article>`).join("");
   $("shipmentList").querySelectorAll(".copy-id").forEach(b=>b.addEventListener("click",async()=>{const id=b.closest(".shipment").dataset.id;try{await navigator.clipboard.writeText(id);b.textContent="Copied";setTimeout(()=>b.textContent="Copy ID",1200)}catch{prompt("Copy tracking ID:",id)}}));
   $("shipmentList").querySelectorAll(".save-update").forEach(b=>b.addEventListener("click",async()=>{const el=b.closest(".shipment");b.disabled=true;try{await api("/api/admin/shipments/"+encodeURIComponent(el.dataset.id),{method:"PATCH",body:JSON.stringify({status:el.querySelector(".new-status").value,location:el.querySelector(".new-location").value,checkpointAction:el.querySelector(".checkpoint-action").value,eventNote:el.querySelector(".new-note").value})});message("adminMessage","Shipment updated.");await loadShipments()}catch(err){message("adminMessage",err.message,true)}finally{b.disabled=false}}));
   $("shipmentList").querySelectorAll(".start-gps").forEach(b=>b.addEventListener("click",()=>startGpsSharing(b.closest(".shipment").dataset.id,b)));
@@ -59,21 +59,38 @@ async function loadShipments(){
  }catch(err){message("adminMessage",err.message,true);}
 }
 $("refresh").addEventListener("click",loadShipments);
-const gpsWatches=new Map(),gpsLastSent=new Map();
-function startGpsSharing(id,button){
- if(!navigator.geolocation){message("adminMessage","This browser does not support GPS location.",true);return}
- if(!window.isSecureContext){message("adminMessage","GPS requires HTTPS. Open the secure Render website.",true);return}
- if(gpsWatches.has(id)){message("adminMessage","GPS sharing is already running for "+id);return}
- button.disabled=true;
- const watch=navigator.geolocation.watchPosition(async pos=>{
-  const now=Date.now();if(now-(gpsLastSent.get(id)||0)<10000)return;gpsLastSent.set(id,now);
-  try{await api("/api/admin/shipments/"+encodeURIComponent(id)+"/location",{method:"POST",body:JSON.stringify({latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy:pos.coords.accuracy})});message("adminMessage","GPS location sent for "+id+". Keep this page open while travelling.");const label=button.closest(".shipment")?.querySelector(".gps-label");if(label)label.textContent="GPS: sharing · Updated "+new Date().toLocaleTimeString()}
-  catch(err){message("adminMessage",err.message,true)}
- },err=>{const t={1:"Location permission denied. Allow location access in browser settings.",2:"GPS location unavailable. Check device location settings or signal.",3:"GPS timed out. Try again with better signal."};message("adminMessage",t[err.code]||"Could not obtain GPS location.",true);if(gpsWatches.has(id)){navigator.geolocation.clearWatch(gpsWatches.get(id));gpsWatches.delete(id)}button.disabled=false},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
- gpsWatches.set(id,watch);button.textContent="Sharing requested";button.disabled=false;message("adminMessage","Allow location permission. Keep this staff page open during the trip.");
+const simulatedRoutes=new Map();
+const gpsLastSent=new Map();
+async function startGpsSharing(id,button){
+ if(simulatedRoutes.has(id)){message("adminMessage","A simulated route is already running for "+id);return}
+ const card=button.closest(".shipment");
+ const origin=card?.querySelector("p")?.textContent||"";
+ const fields=origin.split("→");
+ const startText=prompt("Enter START latitude,longitude for this simulated route (example: 40.7128,-74.0060). This is demo data, not phone GPS.");
+ if(!startText)return;
+ const endText=prompt("Enter DESTINATION latitude,longitude for this simulated route.");
+ if(!endText)return;
+ const parse=v=>{const p=v.split(",").map(Number);return p.length===2&&p.every(Number.isFinite)&&Math.abs(p[0])<=90&&Math.abs(p[1])<=180?{latitude:p[0],longitude:p[1]}:null};
+ const start=parse(startText),end=parse(endText);
+ if(!start||!end){message("adminMessage","Coordinates must be latitude,longitude with valid numeric values.",true);return}
+ let step=0;
+ const tick=async()=>{
+  const t=Math.min(step/120,1);
+  const point={latitude:start.latitude+(end.latitude-start.latitude)*t,longitude:start.longitude+(end.longitude-start.longitude)*t,accuracy:null,mode:"simulated"};
+  try{
+   await api("/api/admin/shipments/"+encodeURIComponent(id)+"/location",{method:"POST",body:JSON.stringify(point)});
+   const label=card?.querySelector(".gps-label");if(label)label.textContent="SIMULATION · "+Math.round(t*100)+"% along demo route";
+   message("adminMessage","Simulated route updated for "+id+". This is not real GPS.");
+   step++;
+  }catch(err){message("adminMessage",err.message,true);pauseSimulatedRoute(id);return}
+  if(t>=1){pauseSimulatedRoute(id);message("adminMessage","Simulated route reached its demo destination. Restart to replay.");}
+ };
+ await tick();
+ if(step<=120){const timer=setInterval(tick,10000);simulatedRoutes.set(id,timer);button.textContent="Simulating demo route";message("adminMessage","Demo route started. Use Stop / pause route any time. Customer map is labeled simulated.");}
 }
+function pauseSimulatedRoute(id){if(simulatedRoutes.has(id)){clearInterval(simulatedRoutes.get(id));simulatedRoutes.delete(id)}}
 async function stopGpsSharing(id,button){
- if(gpsWatches.has(id)){navigator.geolocation.clearWatch(gpsWatches.get(id));gpsWatches.delete(id)}gpsLastSent.delete(id);button.disabled=true;
- try{await api("/api/admin/shipments/"+encodeURIComponent(id)+"/location/stop",{method:"POST"});message("adminMessage","GPS sharing stopped for "+id+".");await loadShipments()}catch(err){message("adminMessage",err.message,true)}finally{button.disabled=false}
+ pauseSimulatedRoute(id);button.disabled=true;
+ try{await api("/api/admin/shipments/"+encodeURIComponent(id)+"/location/stop",{method:"POST"});message("adminMessage","Simulated route stopped for "+id+".");await loadShipments()}catch(err){message("adminMessage",err.message,true)}finally{button.disabled=false}
 }
 $("logout").addEventListener("click",async()=>{try{await api("/api/admin/logout",{method:"POST"})}catch{}adminToken="";$("dashboard").classList.add("hidden");$("loginPanel").classList.remove("hidden");message("adminMessage","You have signed out.");});
