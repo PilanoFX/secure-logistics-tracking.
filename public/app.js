@@ -56,38 +56,4 @@ async function loadShipments(){
  }catch(err){message("adminMessage",err.message,true);}
 }
 $("refresh").addEventListener("click",loadShipments);
-const simulatedRoutes=new Map();
-const gpsLastSent=new Map();
-async function startGpsSharing(id,button){
- if(simulatedRoutes.has(id)){message("adminMessage","A simulated route is already running for "+id);return}
- const card=button.closest(".shipment");
- const origin=card?.querySelector("p")?.textContent||"";
- const fields=origin.split("→");
- const startText=prompt("Enter START latitude,longitude for this simulated route (example: 40.7128,-74.0060). This is demo data, not phone GPS.");
- if(!startText)return;
- const endText=prompt("Enter DESTINATION latitude,longitude for this simulated route.");
- if(!endText)return;
- const parse=v=>{const p=v.split(",").map(Number);return p.length===2&&p.every(Number.isFinite)&&Math.abs(p[0])<=90&&Math.abs(p[1])<=180?{latitude:p[0],longitude:p[1]}:null};
- const start=parse(startText),end=parse(endText);
- if(!start||!end){message("adminMessage","Coordinates must be latitude,longitude with valid numeric values.",true);return}
- let step=0;
- const tick=async()=>{
-  const t=Math.min(step/120,1);
-  const point={latitude:start.latitude+(end.latitude-start.latitude)*t,longitude:start.longitude+(end.longitude-start.longitude)*t,accuracy:null,mode:"simulated"};
-  try{
-   await api("/api/admin/shipments/"+encodeURIComponent(id)+"/location",{method:"POST",body:JSON.stringify(point)});
-   const label=card?.querySelector(".gps-label");if(label)label.textContent="SIMULATION · "+Math.round(t*100)+"% along demo route";
-   message("adminMessage","Simulated route updated for "+id+". This is not real GPS.");
-   step++;
-  }catch(err){message("adminMessage",err.message,true);pauseSimulatedRoute(id);return}
-  if(t>=1){pauseSimulatedRoute(id);message("adminMessage","Simulated route reached its demo destination. Restart to replay.");}
- };
- await tick();
- if(step<=120){const timer=setInterval(tick,10000);simulatedRoutes.set(id,timer);button.textContent="Simulating demo route";message("adminMessage","Demo route started. Use Stop / pause route any time. Customer map is labeled simulated.");}
-}
-function pauseSimulatedRoute(id){if(simulatedRoutes.has(id)){clearInterval(simulatedRoutes.get(id));simulatedRoutes.delete(id)}}
-async function stopGpsSharing(id,button){
- pauseSimulatedRoute(id);button.disabled=true;
- try{await api("/api/admin/shipments/"+encodeURIComponent(id)+"/location/stop",{method:"POST"});message("adminMessage","Simulated route stopped for "+id+".");await loadShipments()}catch(err){message("adminMessage",err.message,true)}finally{button.disabled=false}
-}
 $("logout").addEventListener("click",async()=>{try{await api("/api/admin/logout",{method:"POST"})}catch{}adminToken="";$("dashboard").classList.add("hidden");$("loginPanel").classList.remove("hidden");message("adminMessage","You have signed out.");});
