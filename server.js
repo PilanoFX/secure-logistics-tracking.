@@ -84,8 +84,8 @@ app.get("/api/track/:id", (req, res) => {
   const id = clean(req.params.id, 80).toUpperCase();
   const shipment = readShipments().find(s => s.trackingId === id);
   if (!shipment) return res.status(404).json({ error: "No shipment was found for that tracking ID. Check the number and try again." });
-  const { trackingId, recipient, origin, destination, status, estimatedDelivery, history, createdAt } = shipment;
-  res.json({ trackingId, recipient, origin, destination, status, estimatedDelivery, history, createdAt });
+  const { trackingId, recipient, origin, destination, status, estimatedDelivery, history, createdAt, currentLocation, gpsSharing } = shipment;
+  res.json({ trackingId, recipient, origin, destination, status, estimatedDelivery, history, createdAt, currentLocation: currentLocation || null, gpsSharing: Boolean(gpsSharing) });
 });
 
 app.get("/api/admin/shipments", requireAdmin, (req, res) => {
@@ -115,6 +115,9 @@ app.post("/api/admin/shipments", requireAdmin, (req, res) => {
     notes: clean(body.notes, 500),
     createdAt: date.toISOString(),
     updatedAt: date.toISOString(),
+    gpsSharing: false,
+    currentLocation: null,
+    locationHistory: [],
     history: [{ status, location: origin, timestamp: date.toISOString(), note: "Shipment record created." }]
   };
   items.push(shipment);
@@ -145,6 +148,51 @@ app.patch("/api/admin/shipments/:id", requireAdmin, (req, res) => {
   });
   writeShipments(items);
   res.json(shipment);
+});
+
+// Driver/staff phone location updates. Browser permission is required; sharing only runs while the staff page is open.
+app.post("/api/admin/shipments/:id/location", requireAdmin, (req, res) => {
+  const id = clean(req.params.id, 80).toUpperCase();
+  const items = readShipments();
+  const shipment = items.find(s => s.trackingId === id);
+  if (!shipment) return res.status(404).json({ error: "Shipment not found." });
+  const latitude = Number(req.body?.latitude);
+  const longitude = Number(req.body?.longitude);
+  const accuracy = Number(req.body?.accuracy);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+      !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: "Valid GPS coordinates are required." });
+  }
+  const point = {
+    latitude, longitude,
+    accuracy: Number.isFinite(accuracy) && accuracy >= 0 ? Math.round(accuracy) : null,
+    timestamp: new Date().toISOString()
+  };
+  shipment.currentLocation = point;
+  shipment.gpsSharing = true;
+  shipment.updatedAt = point.timestamp;
+  shipment.locationHistory = Array.isArray(shipment.locationHistory) ? shipment.locationHistory : [];
+  const last = shipment.locationHistory[shipment.locationHistory.length - 1];
+  // Store a breadcrumb only after a meaningful move (about 100m) or 2 minutes.
+  const moved = !last || Math.abs(last.latitude - latitude) > 0.0008 || Math.abs(last.longitude - longitude) > 0.0008;
+  const aged = !last || Date.now() - new Date(last.timestamp).getTime() >= 120000;
+  if (moved || aged) {
+    shipment.locationHistory.push(point);
+    if (shipment.locationHistory.length > 100) shipment.locationHistory = shipment.locationHistory.slice(-100);
+  }
+  writeShipments(items);
+  res.json({ ok: true, currentLocation: shipment.currentLocation, gpsSharing: true });
+});
+
+app.post("/api/admin/shipments/:id/location/stop", requireAdmin, (req, res) => {
+  const id = clean(req.params.id, 80).toUpperCase();
+  const items = readShipments();
+  const shipment = items.find(s => s.trackingId === id);
+  if (!shipment) return res.status(404).json({ error: "Shipment not found." });
+  shipment.gpsSharing = false;
+  shipment.updatedAt = new Date().toISOString();
+  writeShipments(items);
+  res.json({ ok: true, gpsSharing: false });
 });
 
 app.delete("/api/admin/shipments/:id", requireAdmin, (req, res) => {
