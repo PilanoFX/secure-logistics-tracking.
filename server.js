@@ -84,8 +84,8 @@ app.get("/api/track/:id", (req, res) => {
   const id = clean(req.params.id, 80).toUpperCase();
   const shipment = readShipments().find(s => s.trackingId === id);
   if (!shipment) return res.status(404).json({ error: "No shipment was found for that tracking ID. Check the number and try again." });
-  const { trackingId, recipient, origin, destination, status, estimatedDelivery, history, createdAt, currentLocation, gpsSharing } = shipment;
-  res.json({ trackingId, recipient, origin, destination, status, estimatedDelivery, history, createdAt, currentLocation: currentLocation || null, gpsSharing: Boolean(gpsSharing) });
+  const { trackingId, recipient, origin, destination, status, estimatedDelivery, history, createdAt, currentLocation, gpsSharing, locationHistory } = shipment;
+  res.json({ trackingId, recipient, origin, destination, status, estimatedDelivery, history, createdAt, currentLocation: currentLocation || null, gpsSharing: Boolean(gpsSharing), locationHistory: Array.isArray(locationHistory) ? locationHistory.slice(-100) : [] });
 });
 
 app.get("/api/admin/shipments", requireAdmin, (req, res) => {
