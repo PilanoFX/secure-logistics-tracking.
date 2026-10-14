@@ -9,7 +9,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // Prefer the configured persistent-disk directory. Remove a trailing dot if the
 // Render environment variable was accidentally saved as "/var/data.".
-let DATA_DIR = (process.env.DATA_DIR || path.join(__dirname, "data")).replace(/\\.$/, "");
+let DATA_DIR = (process.env.DATA_DIR || path.join(__dirname, "data")).replace(/\.$/, "");
 let DB_FILE = path.join(DATA_DIR, "shipments.json");
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const PORT = process.env.PORT || 3000;
