@@ -15,7 +15,7 @@
 <section class="hero">
   <div class="eyebrow">SHIP WITH CONFIDENCE</div>
   <h1>Track your shipment.</h1>
-  <p>Enter your Secure Logistics tracking number to view checkpoint history and the latest GPS location shared by the delivery team.</p>
+  <p>Enter your tracking number to view shipment status, checkpoint updates, and the estimated delivery date.</p>
   <form id="trackForm" class="track-form">
     <label for="trackingId">Tracking number</label>
     <div class="track-row"><input id="trackingId" placeholder="e.g. SLD-US-261012-123456" autocomplete="off" required><button>Track shipment <span aria-hidden="true">→</span></button></div>
@@ -24,7 +24,7 @@
 </section>
 <section id="result" class="result hidden" aria-live="polite"></section>
 <section id="admin" class="admin">
-  <div class="admin-head"><div><div class="eyebrow">AUTHORIZED PERSONNEL</div><h2>Shipment management</h2><p>Create shipments and update their recorded status.</p></div><span class="lock">▣ Staff access</span></div>
+  <div class="admin-head"><div><div class="eyebrow">AUTHORIZED PERSONNEL</div><h2>Shipment management</h2><p>Create shipments, revise delivery estimates, and record checkpoint updates.</p></div><span class="lock">▣ Staff access</span></div>
   <div id="loginPanel" class="panel">
     <form id="loginForm"><label for="adminPassword">Admin password</label><div class="track-row"><input id="adminPassword" type="password" autocomplete="current-password" placeholder="Enter admin password" required><button>Sign in</button></div><p class="hint">The administrator password is configured by the service owner in the hosting environment.</p></form>
   </div>
@@ -35,7 +35,7 @@
         <div><label for="recipient">Recipient name</label><input id="recipient" required maxlength="160" placeholder="Customer name"></div>
         <div><label for="origin">Origin city/state</label><input id="origin" required maxlength="160" placeholder="e.g. Dallas, TX"></div>
         <div><label for="destination">Destination city/state</label><input id="destination" required maxlength="160" placeholder="e.g. Atlanta, GA"></div>
-        <div><label for="eta">Estimated delivery (optional)</label><input id="eta" type="date"></div>
+        <div><label for="eta">Estimated delivery date</label><input id="eta" type="date"></div>
         <div class="full"><label for="notes">Internal notes (optional)</label><input id="notes" maxlength="500" placeholder="Optional note"></div>
         <div class="full"><button>Create tracking number</button></div>
       </form>
